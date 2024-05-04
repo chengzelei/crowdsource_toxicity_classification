@@ -1335,7 +1335,7 @@ class CustomTrainer(PartialLabelTrainer):
                                                         ignore_keys=ignore_keys_for_eval) 
 
                         pg_loss = - worker_log_probs.mean()
-                        self.group_frac[group_idx] *= torch.exp(self.step_size * pg_loss)
+                        self.group_frac[group_idx] *= torch.exp(self.step_size * pg_loss.data)
                         self.group_frac /= self.group_frac.sum()
                         pg_loss = self.group_frac[group_idx] * pg_loss
                         
