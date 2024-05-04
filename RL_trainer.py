@@ -697,7 +697,6 @@ class CustomTrainer(PartialLabelTrainer):
         # Will be useful when we have an iterable dataset so don't know its length.
 
         observed_num_examples = 0
-        
 
         # Main evaluation loop
         for step, inputs in enumerate(dataloader):
@@ -1155,6 +1154,9 @@ class CustomTrainer(PartialLabelTrainer):
                     sampler = sampler if sampler is not None else []
                     _ = list(sampler)
 
+        df = pd.read_csv(args.valid_file)
+        group_vec = df['dominant_topic'].tolist()
+
         total_batched_samples = 0
         for epoch in range(epochs_trained, num_train_epochs):
             epoch_iterator = train_dataloader
@@ -1325,10 +1327,7 @@ class CustomTrainer(PartialLabelTrainer):
                         self.weight_optimizer.zero_grad()
                         model.eval()
                         self.weight_estimator.train()
-                        df = pd.read_csv(args.valid_file)
-                        group_vec = df['dominant_topic'].tolist()
                         group_idx = np.random.choice(15)
-                        self.args.valid_batch_size
                         indices = [i for i, x in enumerate(group_vec) if x == group_idx]
                         valid_dataset = datasets.Dataset.from_dict(self.valid_dataset[indices])
 
@@ -1338,7 +1337,7 @@ class CustomTrainer(PartialLabelTrainer):
                         pg_loss = - worker_log_probs.mean()
                         self.group_frac[group_idx] *= torch.exp(self.step_size * pg_loss)
                         self.group_frac /= self.group_frac.sum()
-                        pg_loss *= self.group_frac[group_idx] 
+                        pg_loss = self.group_frac[group_idx] * pg_loss
                         
 
                         # for group in range(15):
@@ -1347,8 +1346,7 @@ class CustomTrainer(PartialLabelTrainer):
                         #     pg_losses = pg_loss if pg_losses is None else torch.stack((pg_losses, pg_loss))
                                
                            
-                        pg_loss.backward(retain_graph=True)
-                        del pg_loss
+                        pg_loss.backward()
                         self.weight_optimizer.step()
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
