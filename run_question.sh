@@ -1,0 +1,2 @@
+rm -rf question_checkpoints_1/
+nohup torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:29501 --nproc_per_node 2 noisy_learning_question.py --output_dir question_checkpoints_1/ > ours_nll_all_1.txt & 

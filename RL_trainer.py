@@ -196,7 +196,7 @@ class CustomTrainer(PartialLabelTrainer):
         # for i in range(self.num_workers):
         #     label = inputs.pop("label_" + str(i+1))
 
-        weight = torch.nn.functional.one_hot(labels, num_classes=2).float()
+        weight = torch.nn.functional.one_hot(labels, num_classes=15).float()
         # forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
