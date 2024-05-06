@@ -156,13 +156,13 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='/home/zck7060/chatguard_1/datasets/questions_labeled/train_pm_all.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='datasets/questions_labeled/agree_only_all.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
-        default='/home/zck7060/chatguard_1/datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
+        default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
     )
     evaluation_file: Optional[str] = field(
-        default='/home/zck7060/chatguard_1/datasets/questions_labeled/filtered_misaligned_evaluate.csv', metadata={"help": "A csv or a json file containing the validation data."}
+        default='datasets/questions_labeled/filtered_misaligned_evaluate.csv', metadata={"help": "A csv or a json file containing the validation data."}
     )
     test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
 
