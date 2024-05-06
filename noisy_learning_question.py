@@ -93,7 +93,7 @@ class DataTrainingArguments:
         },
     )
     method: str = field(
-        default = 'rl',
+        default = 'default',
         metadata={
             "help": (
                 "Choose between 'rl', 'soft_label', 'partial_label', 'default'"
@@ -156,7 +156,7 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='/home/zck7060/chatguard_1/datasets/questions_labeled/train_multi_all.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='/home/zck7060/chatguard_1/datasets/questions_labeled/train_pm_all.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
         default='/home/zck7060/chatguard_1/datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}

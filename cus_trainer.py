@@ -47,11 +47,11 @@ class PartialLabelTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         
         labels = inputs.pop("label_1")
-        labels_vec = torch.zeros((len(labels), 2)).cuda()
+        labels_vec = torch.zeros((len(labels), 15)).cuda()
         for i in range(self.num_workers):
             if i != 0:
                 labels = inputs.pop("label_" + str(i+1))
-            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=2).float()
+            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=15).float()
             labels_vec += labels_onehot
         labels_vec[labels_vec > 0] = 1
         outputs = model(**inputs)
@@ -77,7 +77,7 @@ class PartialLabelTrainer(Trainer):
         labels = inputs.pop("labels")
         # weight_1 = torch.mean(labels, axis=0, dtype=float)
         # weight_0 = torch.sub(torch.ones_like(weight_1), weight_1)
-        weight = torch.nn.functional.one_hot(labels, num_classes=2).float()
+        weight = torch.nn.functional.one_hot(labels, num_classes=15).float()
         # forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
