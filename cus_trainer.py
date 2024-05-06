@@ -190,7 +190,7 @@ class SoftLabelTrainer(PartialLabelTrainer):
         self.worker_quality_vec = torch.ones(self.num_workers)
         self.loss = "mse"
 
-        exclude_claude = True
+        exclude_claude = False
 
         if exclude_claude:
             self.worker_quality_vec[2] = 0
@@ -198,11 +198,11 @@ class SoftLabelTrainer(PartialLabelTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.pop("label_1")
-        labels_vec = torch.zeros((len(labels), 2)).cuda()
+        labels_vec = torch.zeros((len(labels), 15)).cuda()
         for i in range(self.num_workers):
             if i != 0:
                 labels = inputs.pop("label_" + str(i+1))
-            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=2).float() * self.worker_quality_vec[i]
+            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=15).float() * self.worker_quality_vec[i]
             labels_vec += labels_onehot
         weight = labels_vec/torch.sum(labels_vec)
         # forward pass
