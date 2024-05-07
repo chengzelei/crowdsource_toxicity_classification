@@ -7,7 +7,6 @@ We provide the code for training a toxicity classifier and a worker quality esti
 - `noisy_learning_question.py`: main script to train a toxicity classifier.
 - `cus_trainer.py`: implement partial label learning methods (Jin et al. and PRODEN) and vanilla soft label method.
 - `RL_trainer.py`: implement our method.
-- `select_critical_steps.py`: select critical steps based on explanation.
 - `pm_*.py`: implement the participant-mine voting method.
 
 # Key points in `RL_trainer.py`
