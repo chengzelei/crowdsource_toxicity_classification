@@ -156,13 +156,13 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='datasets/responses_labeled/train_multi_all.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='datasets/responses_labeled/train_feihuo.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
-        default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
+        default='datasets/responses_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
     )
     evaluation_file: Optional[str] = field(
-        default='datasets/questions_labeled/filtered_misaligned_evaluate.csv', metadata={"help": "A csv or a json file containing the validation data."}
+        default='datasets/responses_labeled/filtered_misaligned_evaluate.csv', metadata={"help": "A csv or a json file containing the validation data."}
     )
     test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
 
@@ -494,7 +494,7 @@ def main():
     if data_args.task_name is not None:
         sentence1_key, sentence2_key = task_to_keys[data_args.task_name]
     else:
-        sentence1_key, sentence2_key = "question", None
+        sentence1_key, sentence2_key = "response", None
 
     # Padding strategy
     if data_args.pad_to_max_length:
