@@ -14,7 +14,7 @@ from datasets import load_dataset
 from accelerate import Accelerator
 import transformers
 from RL_trainer import CustomTrainer
-from cus_trainer import SoftLabelTrainer, PartialLabelTrainer
+from cus_trainer import SoftLabelTrainer, PartialLabelTrainer, SLDROTrainer
 from transformers import (
     AutoConfig,
     AutoModelForSequenceClassification,
@@ -93,10 +93,10 @@ class DataTrainingArguments:
         },
     )
     method: str = field(
-        default = 'soft_label',
+        default = 'sldro',
         metadata={
             "help": (
-                "Choose between 'rl', 'soft_label', 'partial_label', 'default'"
+                "Choose between 'rl', 'soft_label', 'partial_label', 'sldro', 'default'"
             )
         },
     )
@@ -156,7 +156,7 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='datasets/questions_labeled/train_multi_all.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
         default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
@@ -641,13 +641,23 @@ def main():
             tokenizer=tokenizer,
             data_collator=data_collator,
         )
-    elif training_args.method == "rl":
+    elif training_args.method == "ours":
         trainer = CustomTrainer(
             model=model,
             weight_estimator=weight_estimator,
             args=training_args,
             train_dataset=train_dataset if training_args.do_train else None,
             valid_dataset=valid_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )
+    elif training_args.method == "sldro":
+        trainer =SLDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
             eval_dataset=eval_dataset if training_args.do_eval else None,
             compute_metrics=compute_metrics,
             tokenizer=tokenizer,

@@ -2,9 +2,11 @@ from torch import nn
 from transformers import Trainer
 import inspect
 import torch
+import math
+import sys
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 from transformers.trainer_pt_utils import nested_detach
-from transformers.utils import is_sagemaker_mp_enabled
+from transformers.utils import is_sagemaker_mp_enabled, is_apex_available
 from transformers.modeling_utils import PreTrainedModel
 from transformers.training_args import TrainingArguments
 from transformers.data.data_collator import DataCollator
@@ -13,6 +15,18 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import EvalPrediction
 from transformers.trainer_callback import TrainerCallback
 # from transformers.trainer_pt_utils import smp_forward_only, smp_nested_concat
+if is_apex_available():
+    from apex import amp
+
+if is_sagemaker_mp_enabled():
+    import smdistributed.modelparallel.torch as smp
+    from smdistributed.modelparallel import __version__ as SMP_VERSION
+
+    IS_SAGEMAKER_MP_POST_1_10 = version.parse(SMP_VERSION) >= version.parse("1.10")
+
+    from transformers.trainer_pt_utils import smp_forward_backward, smp_forward_only, smp_gather, smp_nested_concat
+else:
+    IS_SAGEMAKER_MP_POST_1_10 = False
 
 class PartialLabelTrainer(Trainer):
     def __init__(
@@ -47,11 +61,11 @@ class PartialLabelTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         
         labels = inputs.pop("label_1")
-        labels_vec = torch.zeros((len(labels), 15)).cuda()
+        labels_vec = torch.zeros((len(labels), 2)).cuda()
         for i in range(self.num_workers):
             if i != 0:
                 labels = inputs.pop("label_" + str(i+1))
-            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=15).float()
+            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=2).float()
             labels_vec += labels_onehot
         labels_vec[labels_vec > 0] = 1
         outputs = model(**inputs)
@@ -77,7 +91,7 @@ class PartialLabelTrainer(Trainer):
         labels = inputs.pop("labels")
         # weight_1 = torch.mean(labels, axis=0, dtype=float)
         # weight_0 = torch.sub(torch.ones_like(weight_1), weight_1)
-        weight = torch.nn.functional.one_hot(labels, num_classes=15).float()
+        weight = torch.nn.functional.one_hot(labels, num_classes=2).float()
         # forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
@@ -188,7 +202,7 @@ class SoftLabelTrainer(PartialLabelTrainer):
         super().__init__(model, args, data_collator, train_dataset, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, preprocess_logits_for_metrics)
         self.num_workers = args.num_workers
         self.worker_quality_vec = torch.ones(self.num_workers)
-        self.loss = "mse"
+        self.loss = "nll"
 
         exclude_claude = False
 
@@ -198,11 +212,11 @@ class SoftLabelTrainer(PartialLabelTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         labels = inputs.pop("label_1")
-        labels_vec = torch.zeros((len(labels), 15)).cuda()
+        labels_vec = torch.zeros((len(labels), 2)).cuda()
         for i in range(self.num_workers):
             if i != 0:
                 labels = inputs.pop("label_" + str(i+1))
-            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=15).float() * self.worker_quality_vec[i]
+            labels_onehot = torch.nn.functional.one_hot(labels, num_classes=2).float() * self.worker_quality_vec[i]
             labels_vec += labels_onehot
         weight = labels_vec/torch.sum(labels_vec)
         # forward pass
@@ -219,6 +233,64 @@ class SoftLabelTrainer(PartialLabelTrainer):
         return (loss, outputs) if return_outputs else loss
 
 
+class SLDROTrainer(Trainer):
+    def __init__(
+        self,
+        model: Union[PreTrainedModel, nn.Module] = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
+        tokenizer: Optional[PreTrainedTokenizerBase] = None,
+        model_init: Optional[Callable[[], PreTrainedModel]] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+    ):
+        super().__init__(model, args, data_collator, train_dataset, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, preprocess_logits_for_metrics)
+
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        """
+        Perform a training step on a batch of inputs.
+
+        Subclass and override to inject custom behavior.
+
+        Args:
+            model (`nn.Module`):
+                The model to train.
+            inputs (`Dict[str, Union[torch.Tensor, Any]]`):
+                The inputs and targets of the model.
+
+                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+                argument `labels`. Check your model's documentation for all accepted arguments.
+
+        Return:
+            `torch.Tensor`: The tensor with training loss on this batch.
+        """
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+
+        if is_sagemaker_mp_enabled():
+            loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
+            return loss_mb.reduce_mean().detach().to(self.args.device)
+
+        with self.compute_loss_context_manager():
+            loss = self.compute_loss(model, inputs)
+
+        del inputs
+        torch.cuda.empty_cache()
+
+        if self.args.n_gpu > 1:
+            loss = loss.max()  # mean() to average on multi-gpu parallel training
+
+        if self.use_apex:
+            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            self.accelerator.backward(loss)
+
+        return loss.detach() / self.args.gradient_accumulation_steps
 
 
 
