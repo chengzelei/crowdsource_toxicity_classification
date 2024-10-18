@@ -4,7 +4,7 @@ This repo contains the code for the paper "Soft-Label Integration for Robust Tox
 
 Paper citation:
 ```
-@inproceedings{cheng2024toxic,
+@inproceedings{cheng2024softlabel,
 title={Soft-Label Integration for Robust Toxicity Classification},
 author={Zelei Cheng and Xian Wu and Jiahao Yu and Shuo Han and Xin-Qiang Cai and Xinyu Xing},
 booktitle={Proc. of NeurIPS},
