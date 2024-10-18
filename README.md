@@ -1,4 +1,15 @@
-# crowdsource_toxicity_classification
+# Soft-Label Integration for Robust Toxicity Classification (NeurIPS'24)
+
+This repo contains the code for the paper "Soft-Label Integration for Robust Toxicity Classification".
+
+Paper citation:
+```
+@inproceedings{cheng2024toxic,
+title={Soft-Label Integration for Robust Toxicity Classification},
+author={Zelei Cheng and Xian Wu and Jiahao Yu and Shuo Han and Xin-Qiang Cai and Xinyu Xing},
+booktitle={Proc. of NeurIPS},
+year={2024}
+```
 
 # Code Structure 
 
