@@ -14,6 +14,7 @@ from datasets import load_dataset
 from accelerate import Accelerator
 import transformers
 from RL_trainer import CustomTrainer
+from CVAR_trainer import CVARTrainer
 from cus_trainer import SoftLabelTrainer, PartialLabelTrainer, SLDROTrainer
 from transformers import (
     AutoConfig,
@@ -93,10 +94,10 @@ class DataTrainingArguments:
         },
     )
     method: str = field(
-        default = 'sldro',
+        default = 'ours',
         metadata={
             "help": (
-                "Choose between 'ours', 'soft_label', 'partial_label', 'sldro', 'default'"
+                "Choose between 'ours', 'soft_label', 'partial_label', 'sldro', 'cvar', 'default'"
             )
         },
     )
@@ -156,10 +157,10 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='datasets/responses_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='datasets/responses_labeled/train_multi_all.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
-        default='datasets/responses_labeled/misaligned_valid_human.csv', metadata={"help": "A csv or a json file containing the validation data."}
+        default='datasets/responses_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
     )
     evaluation_file: Optional[str] = field(
         default='datasets/responses_labeled/filtered_misaligned_evaluate.csv', metadata={"help": "A csv or a json file containing the validation data."}
@@ -524,9 +525,9 @@ def main():
         #     if label_to_id is not None and match_str in examples:
         #         result[match_str] = [(example) for example in examples[match_str]]
         
-        # group_str = "dominant_topic"
-        # if group_str in examples:
-        #     result[group_str] = [(example) for example in examples[group_str]]
+        group_str = "dominant_topics"
+        if group_str in examples:
+            result[group_str] = [(example) for example in examples[group_str]]
         return result
 
     with training_args.main_process_first(desc="dataset map pre-processing"):
@@ -596,6 +597,11 @@ def main():
             indices = [i for i, x in enumerate(group_vec) if x == group]
             group_accs.append(np.mean(preds[indices] == p.label_ids[indices]))
         
+        # # Update the DataFrame with predictions
+        df['label_pred'] = preds
+
+        # # Save the updated DataFrame back to the file
+        df.to_csv("response_evaluate_ours.csv", index=False)
         
         result = {"accuracy": np.mean(group_accs), "worst accuracy": np.min(group_accs), "batch_accuracy": group_accs}
         return result
@@ -640,8 +646,40 @@ def main():
             tokenizer=tokenizer,
             data_collator=data_collator,
         )
+    elif training_args.method == 'partial_label_dro':
+        trainer = PartialLabelDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )     
+    elif training_args.method == "soft_label_dro":
+        trainer = SoftLabelDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )   
     elif training_args.method == "ours":
         trainer = CustomTrainer(
+            model=model,
+            weight_estimator=weight_estimator,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            valid_dataset=valid_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )
+    elif training_args.method == "cvar":
+        trainer = CVARTrainer(
             model=model,
             weight_estimator=weight_estimator,
             args=training_args,
