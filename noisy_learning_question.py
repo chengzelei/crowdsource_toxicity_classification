@@ -1,7 +1,7 @@
 import logging
 import os
 os.environ["WANDB_PROJECT"] = "test"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import random
 import sys
 from dataclasses import dataclass, field
@@ -14,6 +14,7 @@ from datasets import load_dataset
 from accelerate import Accelerator
 import transformers
 from RL_trainer import CustomTrainer
+from CVAR_trainer import CVARTrainer
 from cus_trainer import SoftLabelTrainer, PartialLabelTrainer, SLDROTrainer
 from transformers import (
     AutoConfig,
@@ -96,7 +97,7 @@ class DataTrainingArguments:
         default = 'sldro',
         metadata={
             "help": (
-                "Choose between 'rl', 'soft_label', 'partial_label', 'sldro', 'default'"
+                "Choose between 'ours', 'soft_label', 'partial_label', 'sldro', 'cvar', 'default'"
             )
         },
     )
@@ -156,7 +157,7 @@ class DataTrainingArguments:
         },
     )
     train_file: Optional[str] = field(
-        default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the training data."}
+        default='datasets/questions_labeled/train_mv_all_topic.csv', metadata={"help": "A csv or a json file containing the training data."}
     )
     validation_file: Optional[str] = field(
         default='datasets/questions_labeled/misaligned_valid.csv', metadata={"help": "A csv or a json file containing the validation data."}
@@ -335,18 +336,7 @@ def main():
     # Set seed before initializing model.
     # set_seed(training_args.seed)
 
-    # Get the datasets: you can either provide your own CSV/JSON training and evaluation files (see below)
-    # or specify a GLUE benchmark task (the dataset will be downloaded automatically from the datasets Hub).
-    #
-    # For CSV/JSON files, this script will use as labels the column called 'label' and as pair of sentences the
-    # sentences in columns called 'sentence1' and 'sentence2' if such column exists or the first two columns not named
-    # label if at least two columns are provided.
-    #
-    # If the CSVs/JSONs contain only one non-label column, the script does single sentence classification on this
-    # single column. You can easily tweak this behavior (see below)
-    #
-    # In distributed training, the load_dataset function guarantee that only one local process can concurrently
-    # download the dataset.
+
     if data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
@@ -535,9 +525,9 @@ def main():
         #     if label_to_id is not None and match_str in examples:
         #         result[match_str] = [(example) for example in examples[match_str]]
         
-        # group_str = "dominant_topic"
-        # if group_str in examples:
-        #     result[group_str] = [(example) for example in examples[group_str]]
+        group_str = "dominant_topics"
+        if group_str in examples:
+            result[group_str] = [(example) for example in examples[group_str]]
         return result
 
     with training_args.main_process_first(desc="dataset map pre-processing"):
@@ -641,6 +631,36 @@ def main():
             tokenizer=tokenizer,
             data_collator=data_collator,
         )
+    elif training_args.method == "sldro":
+        trainer =SLDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )
+    elif training_args.method == 'partial_label_dro':
+        trainer = PartialLabelDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )     
+    elif training_args.method == "soft_label_dro":
+        trainer = SoftLabelDROTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            compute_metrics=compute_metrics,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )   
     elif training_args.method == "ours":
         trainer = CustomTrainer(
             model=model,
@@ -653,11 +673,13 @@ def main():
             tokenizer=tokenizer,
             data_collator=data_collator,
         )
-    elif training_args.method == "sldro":
-        trainer =SLDROTrainer(
+    elif training_args.method == "cvar":
+        trainer = CVARTrainer(
             model=model,
+            weight_estimator=weight_estimator,
             args=training_args,
             train_dataset=train_dataset if training_args.do_train else None,
+            valid_dataset=valid_dataset if training_args.do_train else None,
             eval_dataset=eval_dataset if training_args.do_eval else None,
             compute_metrics=compute_metrics,
             tokenizer=tokenizer,
