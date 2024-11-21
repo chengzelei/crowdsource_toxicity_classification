@@ -174,9 +174,9 @@ class CustomTrainer(PartialLabelTrainer):
         worker_logits = weight_outputs.get("logits")
         worker_quality_vec = nn.functional.softmax(worker_logits, dim=-1)
         
-        labels_vec = torch.zeros((len(labels), 15)).cuda()
+        labels_vec = torch.zeros((len(labels), 2)).cuda()
         for i in range(self.num_workers):
-            labels_onehot = torch.nn.functional.one_hot(labels_list[i], num_classes=15).float() * worker_quality_vec[:,i].view(1, -1, 1)
+            labels_onehot = torch.nn.functional.one_hot(labels_list[i], num_classes=2).float() * worker_quality_vec[:,i].view(1, -1, 1)
             labels_vec += labels_onehot.squeeze(0)
         weight = labels_vec/torch.sum(labels_vec)
 
@@ -196,7 +196,7 @@ class CustomTrainer(PartialLabelTrainer):
         # for i in range(self.num_workers):
         #     label = inputs.pop("label_" + str(i+1))
 
-        weight = torch.nn.functional.one_hot(labels, num_classes=15).float()
+        weight = torch.nn.functional.one_hot(labels, num_classes=2).float()
         # forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
@@ -222,7 +222,7 @@ class CustomTrainer(PartialLabelTrainer):
     
         worker_quality_vec = nn.functional.softmax(worker_logits, dim=-1)
 
-        labels_onehot = torch.nn.functional.one_hot(labels, num_classes=15).float()
+        labels_onehot = torch.nn.functional.one_hot(labels, num_classes=2).float()
 
         log_probs = -nn.functional.log_softmax(logits, dim=-1)
         weighted_log_probs = torch.mul(log_probs.clone(), labels_onehot)
