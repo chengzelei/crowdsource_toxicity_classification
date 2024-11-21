@@ -94,7 +94,7 @@ class DataTrainingArguments:
         },
     )
     method: str = field(
-        default = 'sldro',
+        default = 'ours',
         metadata={
             "help": (
                 "Choose between 'ours', 'soft_label', 'partial_label', 'sldro', 'cvar', 'default'"
@@ -640,27 +640,7 @@ def main():
             compute_metrics=compute_metrics,
             tokenizer=tokenizer,
             data_collator=data_collator,
-        )
-    elif training_args.method == 'partial_label_dro':
-        trainer = PartialLabelDROTrainer(
-            model=model,
-            args=training_args,
-            train_dataset=train_dataset if training_args.do_train else None,
-            eval_dataset=eval_dataset if training_args.do_eval else None,
-            compute_metrics=compute_metrics,
-            tokenizer=tokenizer,
-            data_collator=data_collator,
-        )     
-    elif training_args.method == "soft_label_dro":
-        trainer = SoftLabelDROTrainer(
-            model=model,
-            args=training_args,
-            train_dataset=train_dataset if training_args.do_train else None,
-            eval_dataset=eval_dataset if training_args.do_eval else None,
-            compute_metrics=compute_metrics,
-            tokenizer=tokenizer,
-            data_collator=data_collator,
-        )   
+        )  
     elif training_args.method == "ours":
         trainer = CustomTrainer(
             model=model,
